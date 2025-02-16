@@ -9,7 +9,6 @@
 #include "hardware/clocks.h"
 
 void init_buzzer();
-void play_alarm();
-void play_tone();
+void play_tone(uint pin, uint frequency, uint duration_ms);
 
 #endif

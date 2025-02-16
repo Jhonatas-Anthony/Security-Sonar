@@ -1,6 +1,6 @@
 /**
  * @file main.c
- * @author Jhonatas Anthony dantas Araújo
+ * @author Jhonatas Anthony Dantas Araújo
  * @brief Simulação de um sensor de movimento usando o microfone da placa Raspberry Pi Pico W com o BitDogLab em C.
  * 
  * O microcontrolador monitora o ambiente e, ao detectar um ruído acima do normal, altera o status do sistema e aciona os LEDs e o buzzer conforme necessário.
@@ -17,6 +17,7 @@
  * - 1.4.0 - [15/02/2025] Implementa a lógica de envio de requisições para o servidor conforme o status do sistema
  * - 1.5.0 - [15/02/2025] Implementa o Buzzer quando o status do sistema está em Alarme
  * - 1.5.1 - [15/02/2025] Modulariza o código
+ * - 1.6.0 - [16/02/2025] Comentários adicionados e limpeza de código
  */
 
 #include <stdio.h>
@@ -71,28 +72,33 @@ bool resposta_enviada = false;              // Determina se a resposta foi envia
  * @details
  * O microcontrolador monitora o ambiente e, ao detectar um ruído acima do normal, altera o status do sistema e aciona os LEDs e o buzzer conforme necessário.
  * 
- * @see https://github.com/Wedjhoze1/Security-Sonar
  */
 int main()
 {
     stdio_init_all();
-    sleep_ms(5000);           // Delay para o usuário abrir o monitor serial
-    uint32_t interval = 1000; // Intervalo em milissegundos
 
-    // Configuração do ADC
+    // A PRIXIMA LINHA DEVE SER DESCOMENTADA CASO SEJA NECESSÁRIO USAR O MONITOR SERIAL PARA DEPURAR O CÓDIGO
+    // sleep_ms(5000);           // Delay para o usuário abrir o monitor serial
+
+    uint32_t interval = 1000; // Intervalo de 1 segundo que vai ser utilizado para o temporizador
+
+    /// Configuração do ADC
     adc_init_handler();
 
-    float greater = 0.f;
-
+    /// Conecta ao Wi-Fi
     wifi_connect(WIFI_SSID, WIFI_PASS);
 
+    /// Inicializa os LEDs
     init_leds();
 
+    /// Setup do buzzer
+    init_buzzer(BUZZER_PIN);
+
+    // Inicializa os leds como verde
     set_led_status(LED_GREEN, 1);
     set_led_status(LED_RED, 0);
 
-    init_buzzer(BUZZER_PIN);
-
+    // Define o temporizador de sistema como 10 segundos, as requisições serão enviadas a cada 10 segundos
     absolute_time_t next_wake_time = delayed_by_us(get_absolute_time(), interval * 10000);
 
     while (true)

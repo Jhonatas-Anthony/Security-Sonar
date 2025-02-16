@@ -1,6 +1,8 @@
 #ifndef WIFI_H
 #define WIFI_H
 
+#include <string.h>
+#include "lwip/dns.h"
 #include "pico/cyw43_arch.h"
 #include "lwip/tcp.h"
 

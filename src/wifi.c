@@ -1,33 +1,57 @@
+/**
+ * @file wifi.c
+ * @brief Implementação das funções de conectividade Wi-Fi e requisições HTTP.
+ * 
+ * Este arquivo contém funções para conectar a uma rede Wi-Fi, enviar requisições
+ * HTTP e gerenciar respostas recebidas do servidor.
+ * 
+ * @author Jhonatas Anthony Dantas Araújo
+ * @date 2025
+ */
+
 #include "include/wifi.h"
-#include <string.h>
-#include "pico/cyw43_arch.h"
-#include "lwip/tcp.h"
-#include "lwip/dns.h"
 
-#define RESPONSE_BUFFER_SIZE 2048
-static char response_buffer[RESPONSE_BUFFER_SIZE];
-static int response_length = 0;
-volatile bool response_complete = false;
-static ip_addr_t server_ip;
-static char stored_http_request[1000];
+#define RESPONSE_BUFFER_SIZE 2048                       // Tamanho do buffer de resposta HTTP.
 
+static char response_buffer[RESPONSE_BUFFER_SIZE];      // Buffer global para armazenar a resposta do servidor.
+
+static int response_length      = 0;                    // Comprimento da resposta armazenada no buffer.
+volatile bool response_complete = false;                // Flag para indicar se a resposta HTTP foi completamente recebida.
+
+static ip_addr_t server_ip;                             // Endereço IP do servidor após resolução do DNS.
+static char stored_http_request[1000];                  // Buffer para armazenar a requisição HTTP antes de ser enviada.                            
+
+/**
+ * @brief Callback para processamento da resposta HTTP.
+ * 
+ * Copia os dados da resposta para o buffer global e identifica o fim da transmissão.
+ * 
+ * @param arg Argumento passado (não utilizado).
+ * @param tpcb Ponteiro para o controle do bloco TCP.
+ * @param p Estrutura contendo os dados recebidos.
+ * @param err Código de erro, se houver.
+ * @return err_t Código de erro da biblioteca lwIP.
+ */
 err_t http_client_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
     printf("Callback HTTP\n");
     if (p == NULL) {
         // O servidor fechou a conexão: resposta completa.
         response_buffer[response_length] = '\0'; // Termina a string
-        // printf("Resposta completa do servidor:\n%s\n", response_buffer);
 
         // Se desejar, extraia o corpo da resposta:
         char *body = strstr(response_buffer, "\r\n\r\n");
         if (body) {
+            // DESCOMENTAR CASO SEJA NECESSÁRIO USAR O MONITOR SERIAL PARA DEPURAR O CÓDIGO
             // printf("Corpo da resposta:\n%s\n", body + 4);
         } else {
-            printf("Corpo da resposta não encontrado\n");
+            // DESCOMENTAR CASO SEJA NECESSÁRIO USAR O MONITOR SERIAL PARA DEPURAR O CÓDIGO
+            // printf("Corpo da resposta não encontrado\n");
         }
-        // Seta a flag para que a main saiba que a resposta está pronta
+
+        // Seta a flag para que o arquivo main.c saiba que a resposta está pronta
         response_complete = true;
 
+        // Fecha a conexão
         tcp_close(tpcb);
         return ERR_OK;
     }
@@ -48,6 +72,16 @@ err_t http_client_callback(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_
     return ERR_OK;
 }
 
+/**
+ * @brief Callback chamado ao estabelecer conexão TCP com o servidor.
+ * 
+ * Envia a requisição HTTP armazenada no buffer `stored_http_request`.
+ * 
+ * @param arg Argumento passado (não utilizado).
+ * @param tpcb Ponteiro para o controle do bloco TCP.
+ * @param err Código de erro da conexão.
+ * @return err_t Código de erro da biblioteca lwIP.
+ */
 err_t custom_tcp_connected_callback(void *arg, struct tcp_pcb *tpcb, err_t err) {
     if (err != ERR_OK) {
         printf("Erro ao conectar ao servidor: %d\n", err);
@@ -67,6 +101,15 @@ err_t custom_tcp_connected_callback(void *arg, struct tcp_pcb *tpcb, err_t err) 
 
 }
 
+/**
+ * @brief Callback chamado após a resolução do DNS.
+ * 
+ * Obtém o endereço IP do servidor e inicia a conexão TCP.
+ * 
+ * @param name Nome do host consultado.
+ * @param ipaddr Endereço IP resolvido.
+ * @param callback_arg Argumento opcional passado ao resolver DNS.
+ */
 void dns_callback(const char *name, const ip_addr_t *ipaddr, void *callback_arg) {
     if (ipaddr == NULL) {
         printf("Erro ao resolver o endereço do servidor\n");
@@ -86,6 +129,15 @@ void dns_callback(const char *name, const ip_addr_t *ipaddr, void *callback_arg)
     }
 }
 
+/**
+ * @brief Envia uma requisição HTTP personalizada.
+ * 
+ * Formata a requisição HTTP e inicia a resolução de DNS para envio ao servidor.
+ * 
+ * @param method Método HTTP (GET, POST, etc.).
+ * @param endpoint URL do recurso requisitado.
+ * @param body Corpo da requisição (caso aplicável).
+ */
 void send_custom_http_request(const char *method, const char *endpoint, const char *body) {
     response_length = 0;
     memset(response_buffer, 0, RESPONSE_BUFFER_SIZE);
@@ -115,6 +167,14 @@ void send_custom_http_request(const char *method, const char *endpoint, const ch
     }
 }
 
+/**
+ * @brief Conecta a uma rede Wi-Fi.
+ * 
+ * Inicializa o chip Wi-Fi, conecta ao SSID fornecido e exibe o endereço IP obtido.
+ * 
+ * @param ssid Nome da rede Wi-Fi.
+ * @param pass Senha da rede Wi-Fi.
+ */
 void wifi_connect(char *ssid, char *pass) {
     if (cyw43_arch_init()) {
         printf("Erro ao inicializar o Wi-Fi\n");
@@ -132,18 +192,35 @@ void wifi_connect(char *ssid, char *pass) {
     printf("Wi-Fi conectado!\n");
 }
 
+/**
+ * @brief Retorna se a resposta HTTP foi completamente recebida.
+ * @return true se a resposta estiver completa, false caso contrário.
+ */
 bool is_response_complete() {
     return response_complete;
 }
 
+/**
+ * @brief Define o status de resposta completa.
+ * @param status Novo valor da flag de resposta completa.
+ */
 void set_response_complete(bool status) {
     response_complete = status;
 }
 
+/**
+ * @brief Retorna o buffer contendo a resposta do servidor.
+ * @return Ponteiro para o buffer de resposta.
+ */
 char *get_response_buffer() {
     return response_buffer;
 }
 
+/**
+ * @brief Define um novo buffer de resposta ou reseta o buffer atual.
+ * @param buffer Novo buffer de resposta ou NULL para resetar.
+ * @return Ponteiro para o buffer atualizado.
+ */
 char *set_response_buffer(char *buffer) {
     if (buffer != NULL) {
         memcpy(response_buffer, buffer, RESPONSE_BUFFER_SIZE);
@@ -153,10 +230,17 @@ char *set_response_buffer(char *buffer) {
     return response_buffer;
 }
 
+/**
+ * @brief Desativa o Wi-Fi e libera recursos.
+ */
 void wifi_cleanup() {
     cyw43_arch_deinit();
 }
 
+/**
+ * @brief Envia uma requisição HTTP para alterar um status no servidor.
+ * @param status Novo status a ser enviado.
+ */
 void send_request_to_change_status(int status) {
         
     // Cria um buffer para armazenar a URL formatada
